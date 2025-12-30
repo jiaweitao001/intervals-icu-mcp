@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "intervals-icu": {
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/index.js"],
+      "env": {
+        "INTERVALS_API_KEY": "REDACTED_API_KEY",
+        "INTERVALS_ATHLETE_ID": "REDACTED_ATHLETE_ID"
+      }
+    }
+  }
+}
