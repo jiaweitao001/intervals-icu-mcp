@@ -1,66 +1,61 @@
 # Intervals.icu MCP Server
 
-让 AI 直接访问您的 Intervals.icu 运动数据进行分析的 MCP (Model Context Protocol) 服务器。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
 
-## 功能特性
+An MCP (Model Context Protocol) server that allows AI assistants to access and analyze your Intervals.icu training data.
 
-这个 MCP Server 提供以下工具让 AI 可以：
+让 AI 直接访问您的 Intervals.icu 运动数据进行分析的 MCP 服务器。
 
-### 📊 活动数据
-- **get_activities** - 获取指定日期范围内的所有训练活动
-- **get_activity_detail** - 获取单个活动的详细信息
-- **get_activity_intervals** - 获取活动的间歇区间数据
-- **get_activity_power_curve** - 获取活动的功率曲线
-- **get_activity_streams** - 获取活动的详细数据流（心率、功率、配速等）
-- **search_activities** - 根据名称或标签搜索活动
+## Features / 功能特性
 
-### 💪 体能分析
-- **get_power_curves** - 获取功率曲线（MMP），显示不同时间段的最佳功率
-- **get_pace_curves** - 获取配速曲线，显示不同距离的最佳配速
-- **get_hr_curves** - 获取心率曲线
-- **get_power_hr_curve** - 获取功率与心率关系曲线，分析有氧效率
+### 📊 Activity Data / 活动数据
+- **get_activities** - List training activities within a date range
+- **get_activity_detail** - Get detailed information for a single activity
+- **get_activity_intervals** - Get interval data for an activity
+- **get_activity_power_curve** - Get power curve for an activity
+- **get_activity_streams** - Get detailed data streams (HR, power, pace, etc.)
+- **search_activities** - Search activities by name or tag
 
-### 🏃 健康与训练
-- **get_athlete_profile** - 获取运动员基本信息
-- **get_wellness** - 获取健康数据（体重、HRV、睡眠、疲劳度等）
-- **get_wellness_for_date** - 获取特定日期的健康数据
-- **get_athlete_summary** - 获取训练摘要（CTL/ATL/Form等）
-- **get_events** - 获取计划的训练和事件
-- **get_gear** - 获取装备信息
+### 💪 Performance Analysis / 体能分析
+- **get_power_curves** - Get power curves (MMP) showing best power for various durations
+- **get_pace_curves** - Get pace curves showing best pace for various distances
+- **get_hr_curves** - Get heart rate curves
+- **get_power_hr_curve** - Get power vs HR curve for aerobic efficiency analysis
 
-## 安装
+### 🏃 Health & Training / 健康与训练
+- **get_athlete_profile** - Get athlete basic information
+- **get_wellness** - Get wellness data (weight, HRV, sleep, fatigue, etc.)
+- **get_wellness_for_date** - Get wellness data for a specific date
+- **get_athlete_summary** - Get training summary (CTL/ATL/Form)
+- **get_events** - Get planned workouts and events
+- **get_gear** - Get equipment information
 
-### 1. 克隆并构建
+## Installation / 安装
+
+### 1. Clone and Build / 克隆并构建
 
 ```bash
-cd intervals_icu_mcp
+git clone https://github.com/jiaweitao001/intervals-icu-mcp.git
+cd intervals-icu-mcp
 npm install
 npm run build
 ```
 
-### 2. 获取 Intervals.icu API 凭证
+### 2. Get Intervals.icu API Credentials / 获取 API 凭证
 
-1. 登录 [Intervals.icu](https://intervals.icu)
-2. 进入 **Settings** (设置)
-3. 在 **API** 部分找到您的 **API Key**
-4. 您的 **Athlete ID** 可以在个人主页 URL 中找到，格式如 `i12345`
+1. Log in to [Intervals.icu](https://intervals.icu)
+2. Go to **Settings**
+3. Find your **API Key** in the API section
+4. Your **Athlete ID** can be found in your profile URL (e.g., `i12345`)
 
-### 3. 配置环境变量
+## Usage / 使用方式
 
-创建 `.env` 文件（或在系统中设置环境变量）：
+### With Claude Desktop / 与 Claude Desktop 集成
 
-```bash
-INTERVALS_API_KEY=your_api_key_here
-INTERVALS_ATHLETE_ID=i12345
-```
+Add to your Claude Desktop config file:
 
-## 使用方式
-
-### 与 Claude Desktop 集成
-
-在 Claude Desktop 的配置文件中添加：
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`  
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
@@ -68,7 +63,7 @@ INTERVALS_ATHLETE_ID=i12345
   "mcpServers": {
     "intervals-icu": {
       "command": "node",
-      "args": ["/path/to/intervals_icu_mcp/dist/index.js"],
+      "args": ["/path/to/intervals-icu-mcp/dist/index.js"],
       "env": {
         "INTERVALS_API_KEY": "your_api_key_here",
         "INTERVALS_ATHLETE_ID": "i12345"
@@ -78,67 +73,65 @@ INTERVALS_ATHLETE_ID=i12345
 }
 ```
 
-### 与 VS Code Copilot 集成
+### With VS Code / 与 VS Code 集成
 
-在 VS Code 设置中配置 MCP Server：
+Create `.vscode/mcp.json` in your workspace:
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "intervals-icu": {
-        "command": "node",
-        "args": ["/path/to/intervals_icu_mcp/dist/index.js"],
-        "env": {
-          "INTERVALS_API_KEY": "your_api_key_here",
-          "INTERVALS_ATHLETE_ID": "i12345"
-        }
+  "servers": {
+    "intervals-icu": {
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/index.js"],
+      "env": {
+        "INTERVALS_API_KEY": "your_api_key_here",
+        "INTERVALS_ATHLETE_ID": "your_athlete_id_here"
       }
     }
   }
 }
 ```
 
-## 使用示例
+## Example Prompts / 使用示例
 
-配置完成后，您可以让 AI 执行以下操作：
+After configuration, you can ask AI to:
 
-### 训练分析
-- "分析我过去30天的训练量"
-- "查看我上周的骑行活动"
-- "我今天的训练负荷是多少？"
+### Training Analysis / 训练分析
+- "Analyze my training volume over the past 30 days"
+- "Show my cycling activities from last week"
+- "What's my current training load?"
 
-### 体能评估
-- "显示我过去一年的功率曲线变化"
-- "我的FTP是多少？"
-- "分析我的有氧效率趋势"
+### Performance Assessment / 体能评估
+- "Show my power curve changes over the past year"
+- "What's my current FTP?"
+- "Analyze my aerobic efficiency trend"
 
-### 健康监测
-- "查看我最近的HRV数据"
-- "我的体重变化趋势如何？"
-- "显示我的疲劳指数"
+### Health Monitoring / 健康监测
+- "Show my recent HRV data"
+- "What's my weight trend?"
+- "Display my fatigue index"
 
-### 装备管理
-- "列出我所有的自行车"
-- "这辆车骑了多少公里？"
-
-## 开发
+## Development / 开发
 
 ```bash
-# 开发模式（使用 tsx 实时运行）
+# Development mode
 npm run dev
 
-# 构建
+# Build
 npm run build
 
-# 监听模式构建
+# Watch mode
 npm run watch
 ```
 
-## API 文档
+## API Documentation / API 文档
 
-本项目基于 [Intervals.icu API](https://intervals.icu/api/v1/docs) 开发。
+This project is built on the [Intervals.icu API](https://intervals.icu/api/v1/docs).
 
-## 许可证
+## License / 许可证
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Contributing / 贡献
+
+Issues and Pull Requests are welcome!
