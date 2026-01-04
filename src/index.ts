@@ -287,6 +287,28 @@ const tools: Tool[] = [
       required: ['start', 'end'],
     },
   },
+  {
+    name: 'get_activities_with_details',
+    description: '获取活动列表（包含完整数据）。此方法可以绕过 Strava 数据限制，获取活动的名称、距离、时间、训练负荷等详细信息。推荐使用此方法代替 get_activities。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        oldest: {
+          type: 'string',
+          description: '最早日期,ISO-8601格式 (如: 2024-01-01)',
+        },
+        newest: {
+          type: 'string',
+          description: '最新日期,ISO-8601格式 (如: 2024-12-31),可选,默认为今天',
+        },
+        type: {
+          type: 'string',
+          description: '运动类型: Ride(骑行), Run(跑步), Swim(游泳)等,默认Ride',
+        },
+      },
+      required: ['oldest'],
+    },
+  },
 ];
 
 // 创建 MCP Server
@@ -406,6 +428,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await client.getPowerHRCurve(
           args?.start as string,
           args?.end as string
+        );
+        break;
+
+      case 'get_activities_with_details':
+        result = await client.getActivitiesWithDetails(
+          args?.oldest as string,
+          args?.newest as string | undefined,
+          (args?.type as string) || 'Ride'
         );
         break;
 

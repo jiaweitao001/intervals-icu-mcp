@@ -290,4 +290,51 @@ export class IntervalsClient {
       `/api/v1/athlete/${this.athleteId}/power-hr-curve?start=${start}&end=${end}`
     );
   }
+
+  /**
+   * 获取活动列表（包含完整数据，绕过 Strava 限制）
+   * 通过功率曲线端点获取活动详情
+   */
+  async getActivitiesWithDetails(
+    oldest: string,
+    newest?: string,
+    type: string = 'Ride'
+  ): Promise<any> {
+    // 计算日期范围的天数
+    const start = new Date(oldest);
+    const end = newest ? new Date(newest) : new Date();
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // 使用自定义日期范围的曲线查询
+    const curveData = await this.request<any>(
+      `/api/v1/athlete/${this.athleteId}/power-curves.json?type=${type}&oldest=${oldest}&newest=${newest || new Date().toISOString().split('T')[0]}`
+    );
+    
+    // 从曲线数据中提取活动信息
+    if (curveData && curveData.activities) {
+      return Object.values(curveData.activities);
+    }
+    
+    return [];
+  }
+
+  /**
+   * 通过多种曲线端点聚合获取活动详情
+   */
+  async getActivityDetailsViaAggregation(activityId: string): Promise<any> {
+    // 尝试从功率曲线获取活动信息
+    try {
+      const powerCurves = await this.request<any>(
+        `/api/v1/athlete/${this.athleteId}/power-curves.json?type=Ride&curves=all`
+      );
+      
+      if (powerCurves?.activities?.[activityId]) {
+        return powerCurves.activities[activityId];
+      }
+    } catch (e) {
+      // 忽略错误，尝试其他方法
+    }
+    
+    return null;
+  }
 }
