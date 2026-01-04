@@ -300,41 +300,139 @@ export class IntervalsClient {
     newest?: string,
     type: string = 'Ride'
   ): Promise<any> {
-    // 计算日期范围的天数
-    const start = new Date(oldest);
-    const end = newest ? new Date(newest) : new Date();
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // 获取功率曲线数据（这个端点会返回活动的基本信息）
+    const curves = `r.${oldest}.${newest || new Date().toISOString().split('T')[0]}`;
     
-    // 使用自定义日期范围的曲线查询
     const curveData = await this.request<any>(
-      `/api/v1/athlete/${this.athleteId}/power-curves.json?type=${type}&oldest=${oldest}&newest=${newest || new Date().toISOString().split('T')[0]}`
+      `/api/v1/athlete/${this.athleteId}/power-curves.json?type=${type}&curves=${curves}`
     );
     
     // 从曲线数据中提取活动信息
     if (curveData && curveData.activities) {
-      return Object.values(curveData.activities);
+      const activities = Object.values(curveData.activities);
+      return {
+        activities,
+        note: activities.length > 0 
+          ? '活动基本信息已获取。如需完整数据（心率流、功率流等），请使用 Strava Bulk Export 导入数据到 Intervals.icu'
+          : '未找到活动数据',
+        strava_limitation: '由于 Strava API 政策限制，从 Strava 同步的活动无法通过 API 获取完整详情。解决方案：1) 使用 Strava Bulk Export 导入数据；2) 配置 Garmin/Wahoo/Zwift 直接同步到 Intervals.icu'
+      };
     }
     
-    return [];
+    return { activities: [], note: '未找到活动数据' };
   }
 
   /**
-   * 通过多种曲线端点聚合获取活动详情
+   * 获取活动功率曲线数据（包含活动列表）
+   * 这是获取 Strava 活动信息的最佳方法
    */
-  async getActivityDetailsViaAggregation(activityId: string): Promise<any> {
-    // 尝试从功率曲线获取活动信息
+  async getActivityPowerCurvesWithActivities(
+    oldest: string,
+    newest: string,
+    type: string = 'Ride'
+  ): Promise<any> {
+    return this.request<any>(
+      `/api/v1/athlete/${this.athleteId}/activity-power-curves.json?oldest=${oldest}&newest=${newest}&type=${type}`
+    );
+  }
+
+  /**
+   * 全文搜索活动（返回完整活动数据）
+   * 注意：对于 Strava 活动，可能只返回部分数据
+   */
+  async searchActivitiesFull(query: string, limit: number = 10): Promise<any[]> {
+    return this.request<any[]>(
+      `/api/v1/athlete/${this.athleteId}/activities/search-full?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
+  }
+
+  /**
+   * 检查活动来源
+   * 返回活动是否来自 Strava（受 API 限制）
+   */
+  async checkActivitySource(activityId: string): Promise<{isStrava: boolean, source: string | null, message: string}> {
+    try {
+      const activity = await this.request<any>(`/api/v1/activity/${activityId}`);
+      
+      // 检查是否是 Strava 活动的空壳
+      if (activity._note?.includes('STRAVA')) {
+        return {
+          isStrava: true,
+          source: 'STRAVA',
+          message: '此活动来自 Strava，由于 Strava API 政策限制，无法通过 API 获取完整数据。建议：使用 Strava Bulk Export 功能导入数据，或配置 Garmin/Wahoo/Zwift 直接同步。'
+        };
+      }
+      
+      return {
+        isStrava: false,
+        source: activity.source || 'UNKNOWN',
+        message: '此活动可以通过 API 完整访问'
+      };
+    } catch (e) {
+      // 422 错误通常意味着是 Strava 活动
+      if (e instanceof Error && e.message.includes('422')) {
+        return {
+          isStrava: true,
+          source: 'STRAVA',
+          message: '此活动来自 Strava，由于 Strava API 政策限制，无法通过 API 获取完整数据。'
+        };
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * 获取活动的最大可用数据
+   * 尝试多种方法获取尽可能多的活动信息
+   */
+  async getMaxAvailableActivityData(activityId: string): Promise<any> {
+    const result: any = {
+      id: activityId,
+      dataSource: [],
+      strava_limited: false
+    };
+
+    // 1. 尝试直接获取活动详情
+    try {
+      const activity = await this.request<any>(`/api/v1/activity/${activityId}`);
+      if (!activity._note?.includes('STRAVA')) {
+        result.activity = activity;
+        result.dataSource.push('activity_detail');
+      } else {
+        result.strava_limited = true;
+        result.activity = { id: activityId, _note: activity._note };
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('422')) {
+        result.strava_limited = true;
+      }
+    }
+
+    // 2. 从功率曲线获取活动基本信息
     try {
       const powerCurves = await this.request<any>(
         `/api/v1/athlete/${this.athleteId}/power-curves.json?type=Ride&curves=all`
       );
-      
       if (powerCurves?.activities?.[activityId]) {
-        return powerCurves.activities[activityId];
+        result.basicInfo = powerCurves.activities[activityId];
+        result.dataSource.push('power_curves');
       }
     } catch (e) {
-      // 忽略错误，尝试其他方法
+      // 忽略错误
     }
-    
-    return null;
+
+    // 3. 如果是 Strava 活动，添加解决方案说明
+    if (result.strava_limited) {
+      result.solution = {
+        description: '此活动来自 Strava，由于 Strava API 政策限制，无法获取完整数据',
+        options: [
+          '1. 使用 Strava Bulk Export: 在 Strava 设置中申请数据导出，然后在 Intervals.icu 设置中导入',
+          '2. 配置直接同步: 将 Garmin/Wahoo/Zwift/Coros 等设备直接连接到 Intervals.icu',
+          '3. 手动上传: 从设备或 Strava 下载 FIT/TCX 文件，手动上传到 Intervals.icu'
+        ]
+      };
+    }
+
+    return result;
   }
 }

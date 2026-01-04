@@ -309,6 +309,34 @@ const tools: Tool[] = [
       required: ['oldest'],
     },
   },
+  {
+    name: 'get_max_activity_data',
+    description: '获取单个活动的最大可用数据。对于 Strava 同步的活动，会尝试多种方法获取尽可能多的信息，并提供解决方案说明。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        activity_id: {
+          type: 'string',
+          description: '活动ID',
+        },
+      },
+      required: ['activity_id'],
+    },
+  },
+  {
+    name: 'check_activity_source',
+    description: '检查活动的数据来源，判断是否来自 Strava（受 API 限制）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        activity_id: {
+          type: 'string',
+          description: '活动ID',
+        },
+      },
+      required: ['activity_id'],
+    },
+  },
 ];
 
 // 创建 MCP Server
@@ -437,6 +465,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           args?.newest as string | undefined,
           (args?.type as string) || 'Ride'
         );
+        break;
+
+      case 'get_max_activity_data':
+        result = await client.getMaxAvailableActivityData(args?.activity_id as string);
+        break;
+
+      case 'check_activity_source':
+        result = await client.checkActivitySource(args?.activity_id as string);
         break;
 
       default:
