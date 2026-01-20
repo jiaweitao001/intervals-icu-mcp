@@ -305,8 +305,38 @@ const tools: Tool[] = [
           type: 'string',
           description: '运动类型: Ride(骑行), Run(跑步), Swim(游泳)等,默认Ride',
         },
+        limit: {
+          type: 'number',
+          description: '返回结果数量限制（按 start_date_local 倒序排序后截取）',
+        },
       },
       required: ['oldest'],
+    },
+  },
+  {
+    name: 'get_recent_activities_with_details',
+    description: '获取最近 N 次活动列表（包含基本详情，按 start_date_local 倒序排序）。内部会用 lookback_days 扩大窗口后再截取，避免“最近N次取错”。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        n: {
+          type: 'number',
+          description: '最近活动数量,默认5',
+        },
+        type: {
+          type: 'string',
+          description: '运动类型: Ride(骑行), Run(跑步), Swim(游泳)等,默认Ride',
+        },
+        lookback_days: {
+          type: 'number',
+          description: '向前回溯天数（用于扩大候选集），默认120',
+        },
+        newest: {
+          type: 'string',
+          description: '最新日期,ISO-8601格式 (如: 2026-01-20),可选,默认为今天',
+        },
+      },
+      required: [],
     },
   },
   {
@@ -463,7 +493,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await client.getActivitiesWithDetails(
           args?.oldest as string,
           args?.newest as string | undefined,
-          (args?.type as string) || 'Ride'
+          (args?.type as string) || 'Ride',
+          args?.limit as number | undefined
+        );
+        break;
+
+      case 'get_recent_activities_with_details':
+        result = await client.getRecentActivitiesWithDetails(
+          (args?.n as number) || 5,
+          (args?.type as string) || 'Ride',
+          (args?.lookback_days as number) || 120,
+          args?.newest as string | undefined
         );
         break;
 

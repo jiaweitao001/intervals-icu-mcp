@@ -30,6 +30,12 @@ export interface Activity {
   icu_ftp?: number;
   icu_atl?: number;
   icu_ctl?: number;
+  icu_weighted_avg_watts?: number;
+  icu_average_watts?: number;
+  icu_power_hr?: number;
+  icu_efficiency_factor?: number;
+  icu_decoupling?: number;
+  icu_variability_index?: number;
   calories?: number;
   trainer?: boolean;
   tags?: string[];
@@ -83,6 +89,19 @@ export interface Event {
   moving_time?: number;
 }
 
+export interface ActivitiesWithDetailsResponse {
+  activities: Activity[];
+  sorted_by: string;
+  note: string;
+  strava_limitation: string;
+  window?: {
+    oldest: string;
+    newest: string;
+    lookback_days?: number;
+  };
+  requested_count?: number;
+}
+
 export class IntervalsClient {
   private apiKey: string;
   private athleteId: string;
@@ -118,6 +137,20 @@ export class IntervalsClient {
     return response.json();
   }
 
+  private formatDateYYYYMMDD(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
+  private sortByStartDateLocalDesc<T extends { start_date_local?: string }>(
+    items: T[]
+  ): T[] {
+    return [...items].sort((a, b) => {
+      const aTime = a.start_date_local ? Date.parse(a.start_date_local) : Number.NEGATIVE_INFINITY;
+      const bTime = b.start_date_local ? Date.parse(b.start_date_local) : Number.NEGATIVE_INFINITY;
+      return bTime - aTime;
+    });
+  }
+
   /**
    * 获取运动员信息
    */
@@ -136,9 +169,12 @@ export class IntervalsClient {
     const params = new URLSearchParams({ oldest });
     if (newest) params.append('newest', newest);
 
-    return this.request<Activity[]>(
+    const activities = await this.request<Activity[]>(
       `/api/v1/athlete/${this.athleteId}/activities?${params}`
     );
+
+    // Do not rely on API ordering; always sort deterministically.
+    return this.sortByStartDateLocalDesc(activities);
   }
 
   /**
@@ -298,10 +334,12 @@ export class IntervalsClient {
   async getActivitiesWithDetails(
     oldest: string,
     newest?: string,
-    type: string = 'Ride'
-  ): Promise<any> {
+    type: string = 'Ride',
+    limit?: number
+  ): Promise<ActivitiesWithDetailsResponse> {
     // 获取功率曲线数据（这个端点会返回活动的基本信息）
-    const curves = `r.${oldest}.${newest || new Date().toISOString().split('T')[0]}`;
+    const newestDate = newest || this.formatDateYYYYMMDD(new Date());
+    const curves = `r.${oldest}.${newestDate}`;
     
     const curveData = await this.request<any>(
       `/api/v1/athlete/${this.athleteId}/power-curves.json?type=${type}&curves=${curves}`
@@ -309,9 +347,12 @@ export class IntervalsClient {
     
     // 从曲线数据中提取活动信息
     if (curveData && curveData.activities) {
-      const activities = Object.values(curveData.activities);
+      const rawActivities = Object.values(curveData.activities) as Activity[];
+      const activitiesSorted = this.sortByStartDateLocalDesc(rawActivities);
+      const activities = typeof limit === 'number' ? activitiesSorted.slice(0, Math.max(0, limit)) : activitiesSorted;
       return {
         activities,
+        sorted_by: 'start_date_local_desc',
         note: activities.length > 0 
           ? '活动基本信息已获取。如需完整数据（心率流、功率流等），请使用 Strava Bulk Export 导入数据到 Intervals.icu'
           : '未找到活动数据',
@@ -319,7 +360,44 @@ export class IntervalsClient {
       };
     }
     
-    return { activities: [], note: '未找到活动数据' };
+    return {
+      activities: [],
+      sorted_by: 'start_date_local_desc',
+      note: '未找到活动数据',
+      strava_limitation: '由于 Strava API 政策限制，从 Strava 同步的活动无法通过 API 获取完整详情。解决方案：1) 使用 Strava Bulk Export 导入数据；2) 配置 Garmin/Wahoo/Zwift 直接同步到 Intervals.icu'
+    };
+  }
+
+  /**
+   * 获取最近 N 次活动列表（包含基本详情，绕过 Strava 限制）
+   * 实现方式：拉取一个足够大的时间窗 -> 按 start_date_local 降序排序 -> 截取前 N
+   */
+  async getRecentActivitiesWithDetails(
+    count: number = 5,
+    type: string = 'Ride',
+    lookbackDays: number = 120,
+    newest?: string
+  ): Promise<ActivitiesWithDetailsResponse> {
+    const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 5;
+    const safeLookbackDays = Number.isFinite(lookbackDays)
+      ? Math.max(1, Math.floor(lookbackDays))
+      : 120;
+
+    const newestDate = newest || this.formatDateYYYYMMDD(new Date());
+    // 使用本地时间日期对象，避免时区偏移问题
+    const newestParsed = new Date(newestDate + 'T00:00:00');
+    const oldestAsDate = new Date(newestParsed.getTime() - safeLookbackDays * 24 * 60 * 60 * 1000);
+    const oldestDate = this.formatDateYYYYMMDD(oldestAsDate);
+
+    const result = await this.getActivitiesWithDetails(oldestDate, newestDate, type);
+    const activities = Array.isArray(result?.activities) ? result.activities.slice(0, safeCount) : [];
+
+    return {
+      ...result,
+      activities,
+      window: { oldest: oldestDate, newest: newestDate, lookback_days: safeLookbackDays },
+      requested_count: safeCount,
+    };
   }
 
   /**

@@ -11,6 +11,8 @@ An MCP (Model Context Protocol) server that allows AI assistants to access and a
 
 ### 📊 Activity Data / 活动数据
 - **get_activities** - List training activities within a date range
+- **get_activities_with_details** - List activities within a date range (includes richer fields; better for Strava-synced activities)
+- **get_recent_activities_with_details** - Get the most recent N activities (sorted by start_date_local desc; avoids ordering ambiguity)
 - **get_activity_detail** - Get detailed information for a single activity
 - **get_activity_intervals** - Get interval data for an activity
 - **get_activity_power_curve** - Get power curve for an activity
@@ -99,7 +101,10 @@ After configuration, you can ask AI to:
 ### Training Analysis / 训练分析
 - "Analyze my training volume over the past 30 days"
 - "Show my cycling activities from last week"
+- "Fetch my most recent 5 rides (with details)"
 - "What's my current training load?"
+
+Tip: For "recent N" queries, prefer **get_recent_activities_with_details**. It intentionally fetches a wider time window and then sorts by `start_date_local` before taking the top N, so the result is deterministic even if the upstream API response order changes.
 
 ### Performance Assessment / 体能评估
 - "Show my power curve changes over the past year"
